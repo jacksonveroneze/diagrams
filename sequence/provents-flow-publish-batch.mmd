@@ -1,0 +1,26 @@
+sequenceDiagram
+    participant Cliente
+    participant StepFunction
+    participant LambdaDynamoDB as Lambda Leitura DynamoDB
+    participant DynamoDB
+    participant LambdaMap as Lambda Mapeamento id_eq3
+    participant API_ID_EQ3 as API de Mapeamento id_eq3
+    participant SNS
+    participant CloudWatch
+
+    Cliente->>StepFunction: Iniciar Execução da Step Function
+    StepFunction->>LambdaDynamoDB: Invocar Lambda Leitura DynamoDB
+    LambdaDynamoDB->>DynamoDB: Consultar Proventos
+    DynamoDB-->>LambdaDynamoDB: Retornar Proventos
+    LambdaDynamoDB-->>StepFunction: Retornar CCIs Distintos e Lotes
+
+    par Processamento em Paralelo dos Lotes
+        StepFunction->>LambdaMap: Enviar Lote N para Mapeamento id_eq3
+        LambdaMap->>API_ID_EQ3: Chamada API para Lote N
+        API_ID_EQ3-->>LambdaMap: Retornar id_eq3 para Lote N
+        LambdaMap-->>StepFunction: Resultado Mapeamento Lote N
+        StepFunction->>SNS: Publicar Lote N no SNS
+    end
+
+    StepFunction->>CloudWatch: Registrar Erros (se houver)
+    StepFunction-->>Cliente: Execução Concluída
